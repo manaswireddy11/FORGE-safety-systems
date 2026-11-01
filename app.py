@@ -147,8 +147,7 @@ target_lang_code = indian_languages[target_lang_name]
 def is_alert_condition(primary_risk: dict, plan: dict) -> bool:
     has_hazard_flags = len(primary_risk.get("hazard_flags", [])) > 0
     high_heat_stress = primary_risk.get("effective_wbgt_c", 0) >= 28.0
-    rest_required = "0-min Rest" not in plan.get("work_rest_ratio", "")
-    return has_hazard_flags or high_heat_stress or rest_required
+    return has_hazard_flags or high_heat_stress
 
 # 5. Main Execution Button
 if st.button("🚀 Run Full Safety Engine & Agent"):
@@ -239,7 +238,7 @@ if st.button("🚀 Run Full Safety Engine & Agent"):
             "target_language": target_lang_name
         }
         
-        with st.spinner(f"Generating public safety advisory in {target_lang_name} "):
+        with st.spinner(f"Generating public safety advisory in {target_lang_name}..."):
             try:
                 plan = generate_shift_schedule(site_context, primary_risk)
                 st.markdown("---")

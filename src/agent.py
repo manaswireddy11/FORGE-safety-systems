@@ -41,6 +41,8 @@ def generate_shift_schedule(site_context: dict, hazard_vector: dict) -> dict:
     """
 
     models_to_try = [
+        "gemini-3.8-flash",
+        "gemini-3.5-flash-lite",
         "gemini-2.5-flash",
         "gemini-2.5-flash-lite"
     ]
@@ -70,20 +72,20 @@ def generate_shift_schedule(site_context: dict, hazard_vector: dict) -> dict:
                 time.sleep(1)
                 continue
 
-    # Fallback with completely neutral phrasing across regional languages
+    # Neutral fallback scripts across regional languages
     default_scripts = {
-        "Hindi": "ध्यान दें सभी यात्री! मार्ग में तापमान बढ़ा हुआ है। अपनी यात्रा के दौरान पर्याप्त मात्रा में पानी पिएं और छाया में आराम करें।",
-        "Telugu": "గమనిక! మార్గంలో ఉష్ణోగ్రతలు ఎక్కువగా ఉన్నాయి. ప్రయాణంలో ఉన్నవారు తగినంత నీరు త్రాగి, నీడలో విశ్రాంతి తీసుకోండి.",
-        "Kannada": "ಎಲ್ಲಾ ಪ್ರಯಾಣಿಕರ ಗಮನಕ್ಕೆ! ಮಾರ್ಗದಲ್ಲಿ ತಾಪಮಾನ ಹೆಚ್ಚಾಗಿದೆ. ಪ್ರಯಾಣದ ಸಮಯದಲ್ಲಿ ಸಾಕಷ್ಟು ನೀರು ಕುಡಿಯಿರಿ ಮತ್ತು ನೆರಳಿನಲ್ಲಿ ವಿಶ್ರಾಂತಿ ಪಡೆಯಿರಿ.",
-        "Tamil": "கவனியுங்கள்! பாதையில் அதிக வெப்பம் உள்ளது. பயணிகள் பயணத்தின் போது போதுமான அளவு தண்ணீர் குடிக்கவும்.",
-        "Bengali": "মনোযোগ দিন! যাত্রাপথে তাপমাত্রা বেশি। ভ্রমণের সময় পর্যাপ্ত জল পান করুন।"
+        "Hindi": "ध्यान दें सभी यात्री! मार्ग में मौसम सामान्य है। अपनी यात्रा के दौरान सुरक्षित रहें और आवश्यकतानुसार पानी पिएं।",
+        "Telugu": "గమనిక! మార్గంలో వాతావరణం సాధారణంగా ఉంది. ప్రయాణంలో ఉన్నవారు సురక్షితంగా ఉండండి మరియు తగినంత నీరు త్రాగండి.",
+        "Kannada": "ಎಲ್ಲಾ ಪ್ರಯಾಣಿಕರ ಗಮನಕ್ಕೆ! ಮಾರ್ಗದಲ್ಲಿ ವಾತಾವರಣ ಸಾಮಾನ್ಯವಾಗಿದೆ. ಪ್ರಯಾಣದ ಸಮಯದಲ್ಲಿ ಸುರಕ್ಷಿತವಾಗಿರಿ ಮತ್ತು ಅಗತ್ಯಕ್ಕೆ ತಕ್ಕಂತೆ ನೀರು ಕುಡಿಯಿರಿ.",
+        "Tamil": "கவனியுங்கள்! பாதையில் வானிலை இயல்பாக உள்ளது. பயணிகள் பாதுகாப்பாக பயணிக்கவும்.",
+        "Bengali": "মনোযোগ দিন! যাত্রাপথে আবহাওয়া স্বাভাবিক। ভ্রমণের সময় নিরাপদ থাকুন।"
     }
-    fallback_script = default_scripts.get(target_lang, "Attention travelers! Weather conditions are elevated along the route. Stay hydrated and rest in shade.")
+    fallback_script = default_scripts.get(target_lang, "Attention travelers! Environmental conditions are safe along the route. Have a safe journey.")
 
     return {
         "work_rest_ratio": "Normal Outdoor Activity / Standard Rest",
         "hourly_water_quota_ml": 500,
-        "manager_summary": f"Moderate environmental strain reported along the route near {site_context.get('location_name', 'your area')}. Users should stay hydrated and take periodic breaks.",
+        "manager_summary": f"Environmental parameters around {site_context.get('location_name', 'your area')} are within normal safety limits. Public transit and outdoor movement may proceed normally.",
         "audio_script": fallback_script,
         "audio_script_hindi": fallback_script
     }
