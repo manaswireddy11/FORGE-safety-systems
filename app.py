@@ -23,18 +23,28 @@ st.title("🛡️ ResQNet-Intelligent Hazard Detection & Alert System")
 # Initialize LocalStorage client for per-browser persistent memory
 local_storage = LocalStorage()
 
-# Fetch persistent saved profiles for THIS specific browser device
-saved_profiles_raw = local_storage.getItem("resqnet_user_profiles")
-try:
-    user_profiles = json.loads(saved_profiles_raw) if saved_profiles_raw else []
-except Exception:
-    user_profiles = []
-
 # Initialize Session State Variables
 if "start_location_text" not in st.session_state:
     st.session_state.start_location_text = ""
 if "gps_attempted" not in st.session_state:
     st.session_state.gps_attempted = False
+if "user_profiles" not in st.session_state:
+    st.session_state.user_profiles = None
+
+# SYNC BROWSER LOCAL STORAGE TO SESSION STATE
+if st.session_state.user_profiles is None:
+    saved_profiles_raw = local_storage.getItem("resqnet_user_profiles")
+    if saved_profiles_raw is not None:
+        try:
+            st.session_state.user_profiles = json.loads(saved_profiles_raw)
+            st.rerun()
+        except Exception:
+            st.session_state.user_profiles = []
+    else:
+        # Initial run placeholder until browser responds
+        user_profiles = []
+else:
+    user_profiles = st.session_state.user_profiles
 
 st.sidebar.header("📍 Corridor & Regional Locations")
 
@@ -127,6 +137,7 @@ with st.sidebar.expander("👤 Register Subscriber Profile"):
         if new_name and new_phone:
             new_profile = {"name": new_name, "phone": new_phone, "language": new_lang}
             user_profiles.append(new_profile)
+            st.session_state.user_profiles = user_profiles
             local_storage.setItem("resqnet_user_profiles", json.dumps(user_profiles))
             st.success(f"Registered {new_name} successfully to this browser!")
             st.rerun()
@@ -142,6 +153,7 @@ if user_profiles:
         if st.button("Delete Selected Profile"):
             idx_to_remove = delete_options.index(profile_to_delete)
             removed_item = user_profiles.pop(idx_to_remove)
+            st.session_state.user_profiles = user_profiles
             local_storage.setItem("resqnet_user_profiles", json.dumps(user_profiles))
             st.success(f"Removed profile '{removed_item['name']}'!")
             st.rerun()
