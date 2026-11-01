@@ -1,0 +1,7 @@
+streamlit
+streamlit-geolocation
+requests
+pandas
+google-genai
+python-dotenv
+gTTS
