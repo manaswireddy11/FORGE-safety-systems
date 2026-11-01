@@ -1,5 +1,6 @@
 import os
 import io
+import sqlite3
 import pandas as pd
 import streamlit as st
 from dotenv import load_dotenv, find_dotenv
@@ -19,8 +20,8 @@ from src.weather_api import fetch_batch_route_weather, fetch_active_disasters
 # Initialize local SQLite database
 init_db()
 
-st.set_page_config(page_title="FORGE: KavachAI", page_icon="🛡️", layout="wide")
-st.title("🛡️ FORGE: Regional Hazard Broadcast & Advisory Engine")
+st.set_page_config(page_title="ResQNet", page_icon="🛡️", layout="wide")
+st.title("🛡️ ResQNet-Intelligent Hazard Detection & Alert System")
 
 # Initialize Session State Variables
 if "start_location_text" not in st.session_state:
@@ -124,6 +125,19 @@ with st.sidebar.expander("👤 Register Subscriber"):
                 st.error("Could not save subscriber details.")
         else:
             st.warning("Please fill in all fields.")
+
+# Database Management Expander (Option A Implementation)
+with st.sidebar.expander("🗑️ Database Management"):
+    if st.button("Clear All Registered Profiles"):
+        db_path = os.path.join("data", "forge_safety.db")
+        if os.path.exists(db_path):
+            conn = sqlite3.connect(db_path)
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM subscribers")
+            conn.commit()
+            conn.close()
+            st.success("All subscriber profiles cleared successfully!")
+            st.rerun()
 
 # 4. Subscriber Selection Dropdown
 subscribers = get_all_subscribers()
