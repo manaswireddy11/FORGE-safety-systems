@@ -5,3 +5,4 @@ pandas
 google-genai
 python-dotenv
 gTTS
+streamlit-local-storage

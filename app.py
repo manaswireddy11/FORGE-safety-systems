@@ -1,11 +1,12 @@
 import os
 import io
-import sqlite3
+import json
 import pandas as pd
 import streamlit as st
 from dotenv import load_dotenv, find_dotenv
 from gtts import gTTS
 from streamlit_geolocation import streamlit_geolocation
+from streamlit_local_storage import LocalStorage
 
 # Force load environment variables right at startup
 load_dotenv(find_dotenv(), override=True)
@@ -14,14 +15,20 @@ from src.whatsapp_service import send_whatsapp_audio
 from src.location_service import geocode_location_name, reverse_geocode, get_route_waypoints
 from src.risk_engine import calculate_hourly_hazards
 from src.agent import generate_shift_schedule
-from src.database import init_db, add_subscriber, get_all_subscribers
 from src.weather_api import fetch_batch_route_weather, fetch_active_disasters
 
-# Initialize local SQLite database
-init_db()
-
-st.set_page_config(page_title="ResQNet", page_icon="🛡️", layout="wide")
+st.set_page_config(page_title="ResQNet: KavachAI", page_icon="🛡️", layout="wide")
 st.title("🛡️ ResQNet-Intelligent Hazard Detection & Alert System")
+
+# Initialize LocalStorage client for per-browser persistent memory
+local_storage = LocalStorage()
+
+# Fetch persistent saved profiles for THIS specific browser
+saved_profiles_raw = local_storage.getItem("resqnet_user_profiles")
+try:
+    user_profiles = json.loads(saved_profiles_raw) if saved_profiles_raw else []
+except Exception:
+    user_profiles = []
 
 # Initialize Session State Variables
 if "start_location_text" not in st.session_state:
@@ -110,45 +117,45 @@ indian_languages = {
     "Odia": "or", "Punjabi": "pa", "Urdu": "ur", "English (India)": "en"
 }
 
-# 3. Subscriber Registration Form in Sidebar
-with st.sidebar.expander("👤 Register Subscriber"):
+# 3. Subscriber Registration Form (Saves into User's Browser Memory)
+with st.sidebar.expander("👤 Register Subscriber Profile"):
     new_name = st.text_input("Subscriber Name:")
     new_phone = st.text_input("Phone Number (+91...):", placeholder="+919876543210")
     new_lang = st.selectbox("Preferred Language:", list(indian_languages.keys()))
     
     if st.button("Save Subscriber Profile"):
         if new_name and new_phone:
-            if add_subscriber(new_name, new_phone, new_lang):
-                st.success(f"Registered {new_name} successfully!")
-                st.rerun()
-            else:
-                st.error("Could not save subscriber details.")
+            # Append profile object to local browser list
+            new_profile = {"name": new_name, "phone": new_phone, "language": new_lang}
+            user_profiles.append(new_profile)
+            local_storage.setItem("resqnet_user_profiles", json.dumps(user_profiles))
+            st.success(f"Registered {new_name} successfully to your device!")
+            st.rerun()
         else:
             st.warning("Please fill in all fields.")
 
-# Database Management Expander (Option A Implementation)
-with st.sidebar.expander("🗑️ Database Management"):
-    if st.button("Clear All Registered Profiles"):
-        db_path = os.path.join("data", "forge_safety.db")
-        if os.path.exists(db_path):
-            conn = sqlite3.connect(db_path)
-            cursor = conn.cursor()
-            cursor.execute("DELETE FROM subscribers")
-            conn.commit()
-            conn.close()
-            st.success("All subscriber profiles cleared successfully!")
+# 4. Profile Management & Individual Deletion
+if user_profiles:
+    with st.sidebar.expander("🗑️ Manage My Saved Profiles"):
+        delete_options = [f"{p['name']} ({p['phone']})" for p in user_profiles]
+        profile_to_delete = st.selectbox("Select Profile to Remove:", delete_options)
+        
+        if st.button("Delete Selected Profile"):
+            idx_to_remove = delete_options.index(profile_to_delete)
+            removed_item = user_profiles.pop(idx_to_remove)
+            local_storage.setItem("resqnet_user_profiles", json.dumps(user_profiles))
+            st.success(f"Removed profile '{removed_item['name']}'!")
             st.rerun()
 
-# 4. Subscriber Selection Dropdown
-subscribers = get_all_subscribers()
-if subscribers:
-    subscriber_options = {f"{s[0]} ({s[1]}, {s[2]})": s for s in subscribers}
+# 5. Target Subscriber Selection Dropdown
+if user_profiles:
+    subscriber_options = {f"{p['name']} ({p['phone']}, {p['language']})": p for p in user_profiles}
     selected_subscriber_label = st.sidebar.selectbox("Select Target Subscriber Profile", list(subscriber_options.keys()))
     selected_subscriber = subscriber_options[selected_subscriber_label]
     
-    target_worker_name = selected_subscriber[0]
-    target_worker_phone = selected_subscriber[1]
-    target_lang_name = selected_subscriber[2]
+    target_worker_name = selected_subscriber["name"]
+    target_worker_phone = selected_subscriber["phone"]
+    target_lang_name = selected_subscriber["language"]
 else:
     st.sidebar.info("💡 Register a subscriber above to send automated WhatsApp broadcasts.")
     target_worker_name = "Default User"
@@ -163,7 +170,7 @@ def is_alert_condition(primary_risk: dict, plan: dict) -> bool:
     high_heat_stress = primary_risk.get("effective_wbgt_c", 0) >= 28.0
     return has_hazard_flags or high_heat_stress
 
-# 5. Main Execution Button
+# 6. Main Execution Button
 if st.button("🚀 Run Full Safety Engine & Agent"):
     if not start_resolved:
         st.error("Please enter a valid Start Location.")
@@ -182,7 +189,6 @@ if st.button("🚀 Run Full Safety Engine & Agent"):
             st.info(f"ℹ️ Area Assessment for **{start_name}**")
         else:
             dest_lat, dest_lon, dest_name = dest_resolved
-            # Clear route cache to ensure mode switching updates ETAs instantly
             get_route_waypoints.clear()
             with st.spinner(f"Calculating transit route checkpoints for {transport_mode}..."):
                 waypoints = get_route_waypoints(start_lat, start_lon, dest_lat, dest_lon, mode=transport_mode)
@@ -246,7 +252,7 @@ if st.button("🚀 Run Full Safety Engine & Agent"):
         site_context = {
             "work_severity": work_severity,
             "ppe_type": ppe_type,
-            "transport_mode": transport_mode,  # Pass active mode (Walk / Cycle / Car)
+            "transport_mode": transport_mode,
             "is_acclimatized": is_acclimatized,
             "location_name": f"Route from {start_name} to {dest_name}" if dest_resolved else start_name,
             "target_language": target_lang_name
@@ -264,28 +270,24 @@ if st.button("🚀 Run Full Safety Engine & Agent"):
                 script_text = plan.get('audio_script', plan.get('audio_script_hindi', ''))
                 st.warning(f"**{target_lang_name} Regional Broadcast Script:** {script_text}")
 
-                # --- 6. CONDITIONAL BROADCAST ENGINE ---
+                # --- CONDITIONAL BROADCAST ENGINE ---
                 st.markdown("---")
                 st.subheader(f"🔊 {target_lang_name} Audio Advisory & Dispatch Engine")
                 
-                # Check if situation is abnormal / hazardous
                 alert_triggered = is_alert_condition(primary_risk, plan)
 
                 if alert_triggered:
                     st.error(f"🚨 **UNSAFE CONDITIONS DETECTED**: Active hazard warnings present")
                     
                     if script_text:
-                        # Synthesize regional audio
                         tts = gTTS(text=script_text, lang=target_lang_code, slow=False)
                         fp = io.BytesIO()
                         tts.write_to_fp(fp)
                         fp.seek(0)
                         audio_bytes = fp.getvalue()
                         
-                        # Render player on UI
                         st.audio(audio_bytes, format="audio/mp3")
                         
-                        # Send WhatsApp message ONLY because an alert was triggered
                         if target_worker_phone:
                             with st.spinner(f"Sending Urgent WhatsApp voice alert to {target_worker_name} ({target_worker_phone})..."):
                                 load_dotenv(find_dotenv(), override=True)
@@ -304,7 +306,6 @@ if st.button("🚀 Run Full Safety Engine & Agent"):
                         else:
                             st.warning("⚠️ Register and select a subscriber profile in the sidebar to test WhatsApp alerts.")
                 else:
-                    # SAFE CONDITIONS HANDLING
                     st.success("✅ **SAFE ENVIRONMENTAL CONDITIONS**: Weather and corridor parameters are normal.")
                     st.info("ℹ️ WhatsApp broadcast skipped. Audio alerts are dispatched to subscriber devices strictly during unsafe or elevated risk conditions.")
 
