@@ -23,7 +23,7 @@ st.title("🛡️ ResQNet-Intelligent Hazard Detection & Alert System")
 # Initialize LocalStorage client for per-browser persistent memory
 local_storage = LocalStorage()
 
-# Fetch persistent saved profiles for THIS specific browser
+# Fetch persistent saved profiles for THIS specific browser device
 saved_profiles_raw = local_storage.getItem("resqnet_user_profiles")
 try:
     user_profiles = json.loads(saved_profiles_raw) if saved_profiles_raw else []
@@ -117,7 +117,7 @@ indian_languages = {
     "Odia": "or", "Punjabi": "pa", "Urdu": "ur", "English (India)": "en"
 }
 
-# 3. Subscriber Registration Form (Saves into User's Browser Memory)
+# 3. Subscriber Registration Form (Saves into Device Browser Memory)
 with st.sidebar.expander("👤 Register Subscriber Profile"):
     new_name = st.text_input("Subscriber Name:")
     new_phone = st.text_input("Phone Number (+91...):", placeholder="+919876543210")
@@ -125,11 +125,10 @@ with st.sidebar.expander("👤 Register Subscriber Profile"):
     
     if st.button("Save Subscriber Profile"):
         if new_name and new_phone:
-            # Append profile object to local browser list
             new_profile = {"name": new_name, "phone": new_phone, "language": new_lang}
             user_profiles.append(new_profile)
             local_storage.setItem("resqnet_user_profiles", json.dumps(user_profiles))
-            st.success(f"Registered {new_name} successfully to your device!")
+            st.success(f"Registered {new_name} successfully to this browser!")
             st.rerun()
         else:
             st.warning("Please fill in all fields.")
